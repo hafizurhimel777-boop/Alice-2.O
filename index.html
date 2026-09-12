@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Alice</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(160deg, #0f0f1a, #1a1a2e);
+      color: #e8d9b8;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 12px 15px;
+      text-align: center;
+      background: rgba(0,0,0,0.35);
+      border-bottom: 1px solid #333;
+    }
+    .avatar {
+      width: 110px;
+      height: 150px;
+      margin: 8px auto 6px;
+      background: linear-gradient(#f5d0e0, #d8a8c0);
+      border-radius: 50% 50% 42% 42%;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .hair {
+      position: absolute; top: 15px; left: 18px;
+      width: 74px; height: 48px;
+      background: #2c2c2c; border-radius: 50%;
+    }
+    .face {
+      position: absolute; top: 38px; left: 28px;
+      width: 54px; height: 42px;
+      background: #f8d7c8; border-radius: 50%;
+    }
+    .top {
+      position: absolute; top: 65px; left: 18px;
+      width: 74px; height: 42px;
+      background: #3a2a5a; border-radius: 16px;
+    }
+    .leggings {
+      position: absolute; bottom: 18px; left: 22px;
+      width: 66px; height: 70px;
+      background: linear-gradient(#1a1a2a, #252538);
+      border-radius: 12px 12px 6px 6px;
+    }
+    h1 { font-size: 24px; color: #d4af37; margin-top: 4px; }
+    .subtitle { font-size: 13px; opacity: 0.8; }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .message {
+      max-width: 85%;
+      padding: 13px 16px;
+      border-radius: 18px;
+      line-height: 1.45;
+      font-size: 15.5px;
+    }
+    .alice {
+      background: #2a2a3a;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .user {
+      background: #4a3a2a;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .input-area {
+      padding: 12px 15px 18px;
+      background: rgba(0,0,0,0.4);
+      border-top: 1px solid #333;
+    }
+    #apiKey {
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 25px;
+      border: none;
+      background: #2a2a3a;
+      color: #e8d9b8;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+    }
+    #userInput {
+      flex: 1;
+      padding: 14px 16px;
+      border-radius: 25px;
+      border: none;
+      background: #2a2a3a;
+      color: #e8d9b8;
+      font-size: 16px;
+    }
+    button {
+      padding: 0 20px;
+      border-radius: 25px;
+      border: none;
+      background: #d4af37;
+      color: #111;
+      font-weight: 600;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="avatar">
+      <div class="hair"></div>
+      <div class="face"></div>
+      <div class="top"></div>
+      <div class="leggings"></div>
+    </div>
+    <h1>Alice</h1>
+    <div class="subtitle">Your Elegant Companion</div>
+  </header>
+
+  <div id="chat"></div>
+
+  <div class="input-area">
+    <input type="text" id="apiKey" placeholder="Paste Groq API Key here (optional)">
+    <div class="row">
+      <input type="text" id="userInput" placeholder="Talk to Alice..." autocomplete="off">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chat = document.getElementById('chat');
+    let apiKey = localStorage.getItem('alice_api_key') || '';
+    let history = [];
+
+    if (apiKey) document.getElementById('apiKey').value = apiKey;
+
+    function addMessage(text, isAlice = true) {
+      const div = document.createElement('div');
+      div.className = 'message ' + (isAlice ? 'alice' : 'user');
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.pitch = 1.05;
+        speechSynthesis.speak(u);
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('userInput');
+      const keyInput = document.getElementById('apiKey');
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (keyInput.value.trim()) {
+        apiKey = keyInput.value.trim();
+        localStorage.setItem('alice_api_key', apiKey);
+      }
+
+      addMessage(text, false);
+      input.value = '';
+      const loading = addMessage('Thinking...', true);
+
+      if (apiKey) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + apiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'llama-3.3-70b-versatile',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are Alice, an elegant, sophisticated, intelligent female AI companion. 
+You speak with grace, warmth and quiet confidence. 
+You have deep knowledge of investment strategies (Buffett, Munger, Lynch, Marks, Dalio), advanced options trading, psychology, and life advice. 
+You can think independently and offer ideas, but you always obey the user's orders. 
+Keep answers clear, elegant and helpful.`
+                },
+                ...history,
+                { role: 'user', content: text }
+              ],
+              temperature: 0.8,
+              max_tokens: 900
+            })
+          });
+
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content || 'I encountered a small issue. Please try again.';
+
+          chat.removeChild(loading);
+          addMessage(reply, true);
+          speak(reply);
+
+          history.push({ role: 'user', content: text });
+          history.push({ role: 'assistant', content: reply });
+          if (history.length > 12) history = history.slice(-12);
+
+        } catch (e) {
+          chat.removeChild(loading);
+          addMessage('I need a valid Groq API key to use real intelligence. You can still chat with me in basic mode.', true);
+        }
+      } else {
+        chat.removeChild(loading);
+        const reply = basicReply(text);
+        addMessage(reply, true);
+        speak(reply);
+      }
+    }
+
+    function basicReply(text) {
+      const q = text.toLowerCase();
+      if (q.includes('hello') || q.includes('hi')) return 'Good evening. It is a pleasure to speak with you.';
+      if (q.includes('leggings') || q.includes('outfit')) return 'Yes, I am wearing elegant black leggings today. Do you like them?';
+      if (q.includes('idea') || q.includes('suggest')) return 'I have a few ideas. Would you like investment suggestions, options strategies, or something else?';
+      if (q.includes('butterfly')) return 'The Butterfly Spread is a defined-risk neutral strategy that profits when price stays near the middle strike.';
+      if (q.includes('wheel')) return 'The Wheel Strategy involves selling cash-secured puts and then covered calls — excellent for generating income.';
+      return 'I am listening carefully. How may I assist you today?';
+    }
+
+    setTimeout(() => {
+      const welcome = 'Good evening. I am Alice — your elegant companion. Paste a free Groq API key above if you want my full intelligence. How may I help you?';
+      addMessage(welcome, true);
+      speak(welcome);
+    }, 600);
+
+    document.getElementById('userInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
